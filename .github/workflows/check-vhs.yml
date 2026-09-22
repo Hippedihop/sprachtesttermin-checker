@@ -50,14 +50,10 @@ jobs:
             --jq 'length')"
 
           if [ "$existing" = "0" ]; then
+            printf 'Der Kurs scheint jetzt buchbar zu sein.\n\nTermin(e): %s\n\n%s\n\nJetzt schnell buchen.\n' "$DETAILS" "$COURSE_URL" > issue.txt
+
             gh issue create \
               --title "VHS-Kurs ist buchbar: 785629" \
               --label "vhs-available" \
-              --body "Der Kurs scheint jetzt buchbar zu sein.
-
-Termin(e): ${DETAILS}
-
-${COURSE_URL}
-
-Jetzt schnell buchen."
+              --body-file issue.txt
           fi
