@@ -1,0 +1,63 @@
+name: VHS-Kurs pruefen
+
+on:
+  schedule:
+    - cron: "3,13,23,33,43,53 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Abhaengigkeiten installieren
+        run: pip install -r requirements.txt
+
+      - name: VHS-Seite pruefen
+        id: check
+        run: |
+          python monitor.py \
+            --url "https://www.vhsit.berlin.de/VHSKURSE/BusinessPages/CourseDetail.aspx?id=785629" \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Alarm erzeugen
+        if: steps.check.outputs.available == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DETAILS: ${{ steps.check.outputs.details }}
+          COURSE_URL: https://www.vhsit.berlin.de/VHSKURSE/BusinessPages/CourseDetail.aspx?id=785629
+        run: |
+          gh label create "vhs-available" --description "VHS-Kurs ist buchbar" --force || true
+
+          existing="$(gh issue list \
+            --state open \
+            --label "vhs-available" \
+            --search '"VHS-Kurs ist buchbar: 785629" in:title' \
+            --json number \
+            --jq 'length')"
+
+          if [ "$existing" = "0" ]; then
+            gh issue create \
+              --title "VHS-Kurs ist buchbar: 785629" \
+              --label "vhs-available" \
+              --body "Der Kurs scheint jetzt buchbar zu sein.
+
+Termin(e): ${DETAILS}
+
+${COURSE_URL}
+
+Jetzt schnell buchen."
+          fi
